@@ -1,0 +1,90 @@
+
+# recebimento dos dados do mpu6050
+
+# importação das libs
+import os 
+import random
+import sqlite3
+import pandas as pd
+from paho.mqtt import client as mqtt_client
+
+
+# config do broker e topicos
+broker = 'test.mosquitto.org'
+port = 1883
+sensedata = "sensedata"
+
+
+# criando um id aleatorio para o client
+client_id = f'subscribe-{random.randint(0, 100)}'
+
+
+# callback da coneção com o broker 
+def connect_mqtt() -> mqtt_client:
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            print("Connected to MQTT Broker!")
+        else:
+            print("Failed to connect, return code %d\n", rc)
+
+    client = mqtt_client.Client(client_id)
+    # client.username_pw_set(username, password)
+    client.on_connect = on_connect
+    client.connect(broker, port)
+    return client
+
+
+# função que normaliza os dados 
+def normalize(x,):
+    normalizado = (x-(-19.613))/(19.613-(-19.613))
+    return round(normalizado,2)
+
+
+#cria e configura a data base 
+conn = sqlite3.connect('vibrac.db')
+cursor = conn.cursor()
+
+cursor.execute('CREATE TABLE IF NOT EXISTS sensor(ciclo REAL, x FLOAT, y FLOAT, z FLOAT)')
+
+# renicia a tabela 
+cursor.execute("DELETE from sensor")
+
+ciclo = 0
+# função que recebe os dados 
+def subscribe(client: mqtt_client):
+    
+    #envia valores de z
+    def on_message(client, userdata, msg):
+        global ciclo
+        
+
+        divi = msg.payload.decode().split(":")
+        x = normalize(float(divi[0]))
+        y = normalize(float(divi[1]))
+        z = normalize(float(divi[2]))
+        
+        cursor.execute('INSERT INTO sensor (ciclo, x, y, z) VALUES(?,?,?,?)',(ciclo,x,y,z))
+        conn.commit()
+
+            # le os aquivos da database
+        # df = pd.read_sql_query("SELECT * FROM sensor", conn)
+        # print(df.loc[df["ciclo"] == ciclo])
+        # ciclo += 1
+            # print(f"valor de x, y e z respectivamente ={x,y,z}, from '{msg.topic}' topic")deburguer
+        # if ciclo == 10:
+        #     ciclo = 0 
+        #     os.system("cls")
+        #     cursor.execute("DELETE from sensor")
+
+    client.subscribe(sensedata)
+    client.on_message = on_message
+
+# função que mantem o client conectado e o sistema em loop
+def run():
+    client = connect_mqtt()
+    subscribe(client)
+    client.loop_forever()
+
+
+if __name__ == '__main__':
+    run()
