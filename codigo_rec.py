@@ -7,9 +7,8 @@ from paho.mqtt import client as mqtt_client
 # config do broker e topicos
 broker = 'test.mosquitto.org'
 port = 1883
-topicx = "sensors/motor1/accel_x"
-topicy = "sensors/motor1/accel_y"
-topicz = "sensors/motor1/accel_z"
+sensedata = "sensedata"
+
 
 # criando um id aleatorio para o client
 client_id = f'subscribe-{random.randint(0, 100)}'
@@ -29,25 +28,28 @@ def connect_mqtt() -> mqtt_client:
     client.connect(broker, port)
     return client
 
+
+# função que normaliza os dados 
+def normalize(x,):
+    normalizado = (x-(-19.613))/(19.613-(-19.613))
+    return round(normalizado,2)
+
+
 # função que recebe os dados 
 def subscribe(client: mqtt_client):
     
     #envia valores de z
     def on_message(client, userdata, msg):
         
-        mapa = {
-            topicx: "X",
-            topicy: "Y",
-            topicz: "Z"
-        }
+        divi = msg.payload.decode().split(":")
+        x = normalize(float(divi[0]))
+        y = normalize(float(divi[1]))
+        z = normalize(float(divi[2]))
         
-        valuede = mapa.get(msg.topic, " eixo não encontrado")
+        print(f"valor de x, y e z respectivamente ={x,y,z}, from '{msg.topic}' topic")
         
-        print(f"valor de {valuede} ={msg.payload.decode()}, from '{msg.topic}' topic")
-    
-    client.subscribe(topicx)
-    client.subscribe(topicy)
-    client.subscribe(topicz)
+    client.subscribe(sensedata)
+
     client.on_message = on_message
 
 # função que mantem o client conectado e o sistema em loop
