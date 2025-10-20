@@ -1,0 +1,28 @@
+import sqlite3
+import pandas as pd
+import time 
+
+conn = sqlite3.connect('vibrac.db', uri=True)
+cursor = conn.cursor()
+
+print("teste")
+
+# função que le o codigo 
+def read():
+    df = pd.read_sql_query("SELECT * FROM sensor", conn)
+    if int(df["ciclo"]) != int(temp):
+        print(df.head(1))
+    else:
+        print('erro')
+
+    temp = df["ciclo"]    
+
+
+
+def run():
+    read()
+    
+
+while True:
+    run()
+    time.sleep(0.2)
