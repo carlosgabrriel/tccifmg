@@ -15,10 +15,13 @@ sensedata = "sensedata"
 # Criando um id aleatório para o client
 client_id = f'subscribe-{random.randint(0, 100)}'
 
-# Função que normaliza os dados
+# Função que normaliza os dados(mexer quando fizer em função do tempo)
+ciclo = []
 def normalize(x):
     normalizado = (x - (-19.613)) / (19.613 - (-19.613))
     return round(normalizado, 2)
+    ciclo.append(ciclo[-1] + 1 if ciclo else 0)
+    ciclo.pop(0)
 
 # --- Interface (PyQtGraph) ---
 app = pg.mkQApp("vibrac")
@@ -31,14 +34,18 @@ layout = QtWidgets.QVBoxLayout()
 central_widget.setLayout(layout)
 window.setCentralWidget(central_widget)
 
-plot1 = pg.PlotWidget(title="Vibração em função do tempo")
+plot1 = pg.PlotWidget(title="Vibração em função da frequencia")
+plot1.setLabel('left', "amplitude", style = {'font-size': '100'})
+plot1.setLabel('bottom', "frequencia", style = {'font-size': '100'})
 plot1.showGrid(x=True, y=True)
+plot1.addLegend()
 layout.addWidget(plot1)
 
-curve1 = plot1.plot(pen='r', name="Vibração X")
+curve1 = plot1.plot(pen=pg.mkPen(color = 'r', width = 2), name="Vibração X")
+curve2 = plot1.plot(pen=pg.mkPen(color = 'b', width = 2), name="Vibração y")
+curve3 = plot1.plot(pen=pg.mkPen(color = 'g', width = 2), name="Vibração z")
 
-ciclo = []
-amplix = []
+
 
 # --- MQTT ---
 def connect_mqtt() -> mqtt_client:
@@ -54,27 +61,47 @@ def connect_mqtt() -> mqtt_client:
     return client
 
 
+#função da FFT
+amplixx , amplixy , amplixz = [],[],[]
+def fft(eixo,curva,amplix):
+    amplix.append(eixo)
+    
+    if len(amplix) > 15:
+            amplix.pop(0)
+
+            # ftt
+    if len(amplix) == 15:
+        fs = 5
+        t = 1/fs
+        fft_amplix = np.fft.fft(amplix)
+        freq = np.fft.fftfreq(len(amplix), t)
+
+        temp = np.arange(len(freq)//2)
+        freq = freq[temp]
+        fft_amplix = np.abs(fft_amplix[temp])
+
+        curva.setData(freq, fft_amplix)
+
+
+# função que recebe os dados e mostra no grafico
 def subscribe(client: mqtt_client):
     def on_message(client, userdata, msg):
         global amplix, ciclo
-
+        global amplixx , amplixy , amplixz
         divi = msg.payload.decode().split(":")
         try:
-            x = normalize(float(divi[0]))
-            y = normalize(float(divi[1]))
-            z = normalize(float(divi[2]))
+            x = float(divi[0])
+            y = float(divi[1])
+            z = float(divi[2])
         except:
             return
 
+        fft(x,curve1,amplixx)
+        fft(y,curve2,amplixy)
+        fft(z,curve3,amplixz)
+
         print(f"x, y, z = {x, y, z} from topic '{msg.topic}'")
 
-        ciclo.append(ciclo[-1] + 1 if ciclo else 0)
-        amplix.append(x)
-        if len(ciclo) > 50:
-            ciclo.pop(0)
-            amplix.pop(0)
-
-        curve1.setData(ciclo, amplix)
 
     client.subscribe(sensedata)
     client.on_message = on_message
@@ -94,3 +121,4 @@ t.start()
 # --- Executa interface ---
 window.show()
 app.exec()
+
