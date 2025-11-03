@@ -62,25 +62,43 @@ def connect_mqtt() -> mqtt_client:
 
 
 #função da FFT
-amplixx , amplixy , amplixz = [],[],[]
-def fft(eixo,curva,amplix):
+amplixx, amplixy, amplixz = [], [], []
+fs = 2400
+N = 512
+update_counterx= 0  # variável global para controlar atualização
+update_countery= 0
+update_counterz= 0
+updatebas = 0
+
+def fft(eixo, curva, amplix,nome):
+    global update_counterx, update_countery, update_counterz, updatebas
+
+    # adiciona nova amostra
     amplix.append(eixo)
-    
-    if len(amplix) > 15:
-            amplix.pop(0)
 
-            # ftt
-    if len(amplix) == 15:
-        fs = 5
-        t = 1/fs
+    # mantém buffer fixo
+    if len(amplix) > N:
+        amplix.pop(0)
+
+    # contador de atualização
+    if nome == 'x':
+        update_counterx += 1
+        updatebas = update_counterx
+    elif nome == 'y':
+        update_countery += 1
+        updatebas = update_countery
+    else:
+        update_counterz += 1
+        updatebas = update_counterz
+
+    if updatebas % 15 == 0 and len(amplix) == N:
+        t = 1 / fs
         fft_amplix = np.fft.fft(amplix)
-        freq = np.fft.fftfreq(len(amplix), t)
+        freq = np.fft.fftfreq(N, t)
 
-        temp = np.arange(len(freq)//2)
-        freq = freq[temp]
-        fft_amplix = np.abs(fft_amplix[temp])
-
-        curva.setData(freq, fft_amplix)
+        # metade positiva
+        N2 = N // 2
+        curva.setData(freq[:N2], np.abs(fft_amplix[:N2]))
 
 
 # função que recebe os dados e mostra no grafico
@@ -96,11 +114,11 @@ def subscribe(client: mqtt_client):
         except:
             return
 
-        fft(x,curve1,amplixx)
-        fft(y,curve2,amplixy)
-        fft(z,curve3,amplixz)
+        fft(x,curve1,amplixx,'x')
+        fft(y,curve2,amplixy,'y')
+        fft(z,curve3,amplixz,'z')
 
-        print(f"x, y, z = {x, y, z} from topic '{msg.topic}'")
+        # print(f"x, y, z = {x, y, z} from topic '{msg.topic}'")
 
 
     client.subscribe(sensedata)
@@ -121,4 +139,3 @@ t.start()
 # --- Executa interface ---
 window.show()
 app.exec()
-
