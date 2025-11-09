@@ -1,29 +1,23 @@
-# recebimento dos dados do mpu6050
-
 import random
 import threading
+import time
 from paho.mqtt import client as mqtt_client
 import pyqtgraph as pg
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-# Config do broker e tópicos
-broker = 'test.mosquitto.org'
+# --- Config MQTT ---
+broker = 'broker.hivemq.com'
 port = 1883
 sensedata = "sensedata"
-
-# Criando um id aleatório para o client
 client_id = f'subscribe-{random.randint(0, 100)}'
 
-# Função que normaliza os dados(mexer quando fizer em função do tempo)
-ciclo = []
-def normalize(x):
-    normalizado = (x - (-19.613)) / (19.613 - (-19.613))
-    return round(normalizado, 2)
-    ciclo.append(ciclo[-1] + 1 if ciclo else 0)
-    ciclo.pop(0)
+# --- Parâmetros FFT ---
+fs = 2400
+N = 256
+amplixx, amplixy, amplixz = [], [], []
 
-# --- Interface (PyQtGraph) ---
+# --- Interface ---
 app = pg.mkQApp("vibrac")
 window = QtWidgets.QMainWindow()
 window.setWindowTitle("Monitoramento em tempo real")
@@ -34,108 +28,80 @@ layout = QtWidgets.QVBoxLayout()
 central_widget.setLayout(layout)
 window.setCentralWidget(central_widget)
 
-plot1 = pg.PlotWidget(title="Vibração em função da frequencia")
-plot1.setLabel('left', "amplitude", style = {'font-size': '100'})
-plot1.setLabel('bottom', "frequencia", style = {'font-size': '100'})
+plot1 = pg.PlotWidget(title="Vibração em função da frequência")
+plot1.setLabel('left', "Amplitude")
+plot1.setLabel('bottom', "Frequência (Hz)")
 plot1.showGrid(x=True, y=True)
 plot1.addLegend()
 layout.addWidget(plot1)
 
-curve1 = plot1.plot(pen=pg.mkPen(color = 'r', width = 2), name="Vibração X")
-curve2 = plot1.plot(pen=pg.mkPen(color = 'b', width = 2), name="Vibração y")
-curve3 = plot1.plot(pen=pg.mkPen(color = 'g', width = 2), name="Vibração z")
-
-
+curve1 = plot1.plot(pen=pg.mkPen('r', width=2), name="Eixo X")
+curve2 = plot1.plot(pen=pg.mkPen('b', width=2), name="Eixo Y")
+curve3 = plot1.plot(pen=pg.mkPen('g', width=2), name="Eixo Z")
 
 # --- MQTT ---
 def connect_mqtt() -> mqtt_client:
     def on_connect(client, userdata, flags, rc):
-        if rc == 0:
-            print("Connected to MQTT Broker!")
-        else:
-            print("Failed to connect, return code %d\n", rc)
-
+        print("Connected!" if rc == 0 else f"Failed, code={rc}")
     client = mqtt_client.Client(client_id)
     client.on_connect = on_connect
     client.connect(broker, port)
     return client
 
-
-#função da FFT
-amplixx, amplixy, amplixz = [], [], []
-fs = 2400
-N = 512
-update_counterx= 0  # variável global para controlar atualização
-update_countery= 0
-update_counterz= 0
-updatebas = 0
-
-def fft(eixo, curva, amplix,nome):
-    global update_counterx, update_countery, update_counterz, updatebas
-
-    # adiciona nova amostra
-    amplix.append(eixo)
-
-    # mantém buffer fixo
-    if len(amplix) > N:
-        amplix.pop(0)
-
-    # contador de atualização
-    if nome == 'x':
-        update_counterx += 1
-        updatebas = update_counterx
-    elif nome == 'y':
-        update_countery += 1
-        updatebas = update_countery
-    else:
-        update_counterz += 1
-        updatebas = update_counterz
-
-    if updatebas % 15 == 0 and len(amplix) == N:
-        t = 1 / fs
-        fft_amplix = np.fft.fft(amplix)
-        freq = np.fft.fftfreq(N, t)
-
-        # metade positiva
-        N2 = N // 2
-        curva.setData(freq[:N2], np.abs(fft_amplix[:N2]))
-
-
-# função que recebe os dados e mostra no grafico
 def subscribe(client: mqtt_client):
     def on_message(client, userdata, msg):
-        global amplix, ciclo
-        global amplixx , amplixy , amplixz
-        divi = msg.payload.decode().split(":")
+        global amplixx, amplixy, amplixz
         try:
-            x = float(divi[0])
-            y = float(divi[1])
-            z = float(divi[2])
+            x, y, z = map(float, msg.payload.decode().split(":"))
         except:
             return
 
-        fft(x,curve1,amplixx,'x')
-        fft(y,curve2,amplixy,'y')
-        fft(z,curve3,amplixz,'z')
+        amplixx.append(x)
+        amplixy.append(y)
+        amplixz.append(z)
 
-        # print(f"x, y, z = {x, y, z} from topic '{msg.topic}'")
-
+        # Mantém buffer fixo
+        if len(amplixx) > N: amplixx.pop(0)
+        if len(amplixy) > N: amplixy.pop(0)
+        if len(amplixz) > N: amplixz.pop(0)
 
     client.subscribe(sensedata)
     client.on_message = on_message
-
 
 def mqtt_thread():
     client = connect_mqtt()
     subscribe(client)
     client.loop_forever()
 
+# --- FFT + Atualização de Gráfico (controlada por Timer) ---
+def atualizar_grafico():
+    if len(amplixx) == N:
+        t = 1/fs
+        freq = np.fft.fftfreq(N, t)[:N//2]
 
-# --- Roda MQTT em thread paralela ---
+        fftx = np.abs(np.fft.fft(amplixx))[:N//2]
+        ffty = np.abs(np.fft.fft(amplixy))[:N//2]
+        fftz = np.abs(np.fft.fft(amplixz))[:N//2]
+
+        filtro = freq <= 10
+        fftx[filtro] = 5
+        ffty[filtro] = 5
+        fftz[filtro] = 5
+
+        curve1.setData(freq, fftx)
+        curve2.setData(freq, ffty)
+        curve3.setData(freq, fftz)
+
+# --- Timer do Qt (20 FPS = 50 ms) ---
+timer = QtCore.QTimer()
+timer.timeout.connect(atualizar_grafico)
+timer.start(50)
+
+# --- Thread MQTT ---
 t = threading.Thread(target=mqtt_thread)
 t.daemon = True
 t.start()
 
-# --- Executa interface ---
+# --- Inicia a interface ---
 window.show()
 app.exec()
