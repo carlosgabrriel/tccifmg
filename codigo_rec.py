@@ -14,7 +14,7 @@ client_id = f'subscribe-{random.randint(0, 100)}'
 
 # --- Parâmetros FFT ---
 fs = 2400
-N = 256
+N = 1024
 amplixx, amplixy, amplixz = [], [], []
 
 # --- Interface ---
@@ -83,10 +83,16 @@ def atualizar_grafico():
         ffty = np.abs(np.fft.fft(amplixy))[:N//2]
         fftz = np.abs(np.fft.fft(amplixz))[:N//2]
 
-        filtro = freq <= 10
-        fftx[filtro] = 5
-        ffty[filtro] = 5
-        fftz[filtro] = 5
+        #filtro de ruido inicial do proprio sensor
+        filtro_ini= freq <= 10
+        fftx[filtro_ini] = 0
+        ffty[filtro_ini] = 0
+        fftz[filtro_ini] = 0
+
+        #flitro do ruido continuo do sensor 
+        fftx[fftx < 1.5] = 0
+        ffty[ffty < 1.5] = 0
+        fftz[fftz < 1.5] = 0
 
         curve1.setData(freq, fftx)
         curve2.setData(freq, ffty)
