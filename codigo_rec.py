@@ -1,6 +1,5 @@
 import random
 import threading
-import time
 from paho.mqtt import client as mqtt_client
 import pyqtgraph as pg
 import numpy as np
