@@ -5,18 +5,18 @@ import pyqtgraph as pg
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-# --- Config MQTT ---
+#  Config MQTT 
 broker = 'broker.hivemq.com'
 port = 1883
 sensedata = "sensedata"
 client_id = f'subscribe-{random.randint(0, 100)}'
 
-# --- Parâmetros FFT ---
+#  Parâmetros FFT 
 fs = 2400
 N = 1024
 amplixx, amplixy, amplixz = [], [], []
 
-# --- Interface ---
+#  Interface 
 app = pg.mkQApp("vibrac")
 window = QtWidgets.QMainWindow()
 window.setWindowTitle("Monitoramento em tempo real")
@@ -38,7 +38,7 @@ curve1 = plot1.plot(pen=pg.mkPen('r', width=2), name="Eixo X")
 curve2 = plot1.plot(pen=pg.mkPen('b', width=2), name="Eixo Y")
 curve3 = plot1.plot(pen=pg.mkPen('g', width=2), name="Eixo Z")
 
-# --- MQTT ---
+#  MQTT 
 def connect_mqtt() -> mqtt_client:
     def on_connect(client, userdata, flags, rc):
         print("Connected!" if rc == 0 else f"Failed, code={rc}")
@@ -59,7 +59,7 @@ def subscribe(client: mqtt_client):
         amplixy.append(y)
         amplixz.append(z)
 
-        # Mantém buffer fixo
+        # elimina valores antigos do vetor
         if len(amplixx) > N: amplixx.pop(0)
         if len(amplixy) > N: amplixy.pop(0)
         if len(amplixz) > N: amplixz.pop(0)
@@ -72,7 +72,7 @@ def mqtt_thread():
     subscribe(client)
     client.loop_forever()
 
-# --- FFT + Atualização de Gráfico (controlada por Timer) ---
+#  FFT + Atualização de Gráfico (controlada por Timer) 
 def atualizar_grafico():
     if len(amplixx) == N:
         t = 1/fs
@@ -97,16 +97,16 @@ def atualizar_grafico():
         curve2.setData(freq, ffty)
         curve3.setData(freq, fftz)
 
-# --- Timer do Qt (20 FPS = 50 ms) ---
+#  Timer do Qt (20 FPS = 50 ms) 
 timer = QtCore.QTimer()
 timer.timeout.connect(atualizar_grafico)
 timer.start(50)
 
-# --- Thread MQTT ---
+#  Thread MQTT 
 t = threading.Thread(target=mqtt_thread)
 t.daemon = True
 t.start()
 
-# --- Inicia a interface ---
+#  Inicia a interface 
 window.show()
 app.exec()
