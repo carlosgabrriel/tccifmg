@@ -1,17 +1,15 @@
-
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <string.h>
+#include <Wire.h>
+#include <MPU6050_light.h>
 
-Adafruit_MPU6050 mpu;
-sensors_event_t a, g, temp;
+MPU6050 mpu(Wire);
 
-// WiFi / MQTT
-const char* ssid = "...";//nome da rede que vai ser conectado 
-const char* password = "...";//senha da rede que vai ser conectado 
-const char* mqtt_server = "broker.hivemq.com";
+// wifi e MQTT  
+const char* ssid = "Eliane Carlos";          //Nome da rede Wi-Fi
+const char* password = "pereira16";          //Senha da rede Wi-Fi
+const char* mqtt_server = "broker.hivemq.com"; // Broker MQTT utilizado 
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -19,82 +17,90 @@ char payload[64];
 char tempor[64];
 
 unsigned long lastSend = 0;
-const unsigned long sendInterval = 1; // ms
+const unsigned long sendInterval = 1;  // intervalo de envio em ms
 
+// função que so roda uma vez 
 void setup() {
   Serial.begin(115200);
   pinMode(2, OUTPUT);   // LED WiFi
   pinMode(15, OUTPUT);  // LED MQTT
 
-  // Inicia WiFi
+  // conexão com wifi
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting WiFi");
+  Serial.print("Conectando ao WiFi");
   unsigned long t0 = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(200);
     Serial.print(".");
-    if (millis() - t0 > 10000) break; // timeout simples
+    if (millis() - t0 > 10000) break; // timeout
   }
   Serial.println();
   Serial.print("WiFi status: "); Serial.println(WiFi.status());
 
-  // Inicializa MPU6050
-  if (!mpu.begin()) {
-    Serial.println("Failed to start MPU6050");
-    while (1) delay(10);
+  //Inicialização do MPU6050
+  Wire.begin();
+  byte status = mpu.begin();
+  Serial.print("MPU6050 status: ");
+  Serial.println(status);
+  while (status != 0) {
+    Serial.println("Erro ao iniciar MPU6050, tentando novamente...");
+    delay(1000);
+    status = mpu.begin();
   }
-  // Configs opcionais:
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  Serial.println("MPU6050 iniciado com sucesso!");
+  mpu.calcOffsets();  // Calibra com o sensor parado
 
+  //Configuração do MQTT
   client.setServer(mqtt_server, 1883);
 }
 
+//função loop
 void loop() {
   // Mantém MQTT vivo
   if (!client.connected()) reconnectMQTT();
   client.loop();
 
-  // Atualiza LEDs de status
+  // Atualiza LEDs
   digitalWrite(2, WiFi.status() == WL_CONNECTED ? HIGH : LOW);
   digitalWrite(15, client.connected() ? HIGH : LOW);
 
-  // Lê sensor uma vez por loop
-  mpu.getEvent(&a, &g, &temp);
+  // Atualiza o sensor
+  mpu.update();
 
   unsigned long now = millis();
   if (now - lastSend >= sendInterval) {
     lastSend = now;
 
-    // converte para string segura (evita String())
-    dtostrf(a.acceleration.x, 6, 3, tempor);
-    strcpy(payload,tempor);
-    strcat(payload,":");
-    dtostrf(a.acceleration.y, 6, 3, tempor);
-    strcat(payload,tempor);
-    strcat(payload,":");
-    dtostrf(a.acceleration.z, 6, 3, tempor);
-    strcat(payload,tempor);
-    
+    // Converte valores em string 
+    dtostrf(mpu.getAccX(), 6, 3, tempor);
+    strcpy(payload, tempor);
+    strcat(payload, ":");
+    dtostrf(mpu.getAccY(), 6, 3, tempor);
+    strcat(payload, tempor);
+    strcat(payload, ":");
+    dtostrf(mpu.getAccZ(), 6, 3, tempor);
+    strcat(payload, tempor);
+
+    // Publica no tópico MQTT
     client.publish("sensedata", payload);
 
-    
-    
-    // Debug mínimo (pode desativar se quiser testar sem Serial)
-    Serial.print("x,y,z = "); Serial.println(payload);
+    //visualização no serial 
+    Serial.print("x,y,z = ");
+    Serial.println(payload);
   }
 }
 
+//função de reconexão 
 void reconnectMQTT() {
   if (client.connected()) return;
-  Serial.print("MQTT connecting...");
+  Serial.print("Conectando ao MQTT...");
   String clientId = "ESP32Client-";
   clientId += String(random(0xffff), HEX);
   if (client.connect(clientId.c_str())) {
-    Serial.println("ok");
+    Serial.println("Conectado!");
   } else {
-    Serial.print("failed, rc=");
+    Serial.print("Falha, rc=");
     Serial.println(client.state());
     delay(2000);
   }
