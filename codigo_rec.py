@@ -12,7 +12,7 @@ sensedata = "sensedata"
 client_id = f'subscribe-{random.randint(0, 100)}'
 
 #  Parâmetros FFT 
-fs = 2400
+fs = 1000
 N = 1024
 amplixx, amplixy, amplixz = [], [], []
 
@@ -22,12 +22,16 @@ window = QtWidgets.QMainWindow()
 window.setWindowTitle("Monitoramento em tempo real")
 window.resize(800, 600)
 
+
 central_widget = QtWidgets.QWidget()
 layout = QtWidgets.QVBoxLayout()
 central_widget.setLayout(layout)
 window.setCentralWidget(central_widget)
 
 plot1 = pg.PlotWidget(title="Vibração em função da frequência")
+plot1.setBackground("w")
+plot1.setXRange(0,500)
+plot1.setYRange(0,500)
 plot1.setLabel('left', "Amplitude")
 plot1.setLabel('bottom', "Frequência (Hz)")
 plot1.showGrid(x=True, y=True)
@@ -72,7 +76,7 @@ def mqtt_thread():
     subscribe(client)
     client.loop_forever()
 
-#  FFT + Atualização de Gráfico (controlada por Timer) 
+#  FFT + Atualização de Gráfico (controlada por Timer) + pequenos filtros
 def atualizar_grafico():
     if len(amplixx) == N:
         t = 1/fs
