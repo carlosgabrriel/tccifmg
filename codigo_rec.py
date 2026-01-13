@@ -31,7 +31,7 @@ window.setCentralWidget(central_widget)
 plot1 = pg.PlotWidget(title="Vibração em função da frequência")
 plot1.setBackground("w")
 plot1.setXRange(0,500)
-plot1.setYRange(0,500)
+plot1.setYRange(0,1)
 plot1.setLabel('left', "Amplitude")
 plot1.setLabel('bottom', "Frequência (Hz)")
 plot1.showGrid(x=True, y=True)
@@ -82,24 +82,29 @@ def atualizar_grafico():
         t = 1/fs
         freq = np.fft.fftfreq(N, t)[:N//2]
 
-        fftx = np.abs(np.fft.fft(amplixx))[:N//2]
-        ffty = np.abs(np.fft.fft(amplixy))[:N//2]
-        fftz = np.abs(np.fft.fft(amplixz))[:N//2]
+        fftx = np.fft.fft(amplixx)
+        fftxx = (2 / N) * np.abs(fftx[:N//2])
+
+        ffty = np.fft.fft(amplixy)
+        fftyy = (2 / N) * np.abs(ffty[:N//2])
+        
+        fftz = np.fft.fft(amplixz)
+        fftzz = (2 / N) * np.abs(fftz[:N//2])
 
         #filtro de ruido inicial do proprio sensor
         filtro_ini= freq <= 10
-        fftx[filtro_ini] = 0
-        ffty[filtro_ini] = 0
-        fftz[filtro_ini] = 0
+        fftxx[filtro_ini] = 0
+        fftyy[filtro_ini] = 0
+        fftzz[filtro_ini] = 0
 
         #flitro do ruido continuo do sensor 
-        fftx[fftx < 1.5] = 0
-        ffty[ffty < 1.5] = 0
-        fftz[fftz < 1.5] = 0
+        fftxx[fftxx < 0.003] = 0
+        fftyy[fftyy < 0.003] = 0
+        fftzz[fftzz < 0.003] = 0
 
-        curve1.setData(freq, fftx)
-        curve2.setData(freq, ffty)
-        curve3.setData(freq, fftz)
+        curve1.setData(freq, fftxx)
+        curve2.setData(freq, fftyy)
+        curve3.setData(freq, fftzz)
 
 #  Timer do Qt (20 FPS = 50 ms) 
 timer = QtCore.QTimer()
