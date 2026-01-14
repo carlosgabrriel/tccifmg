@@ -6,8 +6,8 @@
 MPU6050 mpu(Wire);
 
 // wifi e MQTT  
-const char* ssid = "Eliane Carlos";          //Nome da rede Wi-Fi
-const char* password = "pereira16";          //Senha da rede Wi-Fi
+const char* ssid = "...";          //Nome da rede Wi-Fi
+const char* password = "...";          //Senha da rede Wi-Fi
 const char* mqtt_server = "broker.hivemq.com"; // Broker MQTT utilizado 
 
 WiFiClient espClient;
