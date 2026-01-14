@@ -57,7 +57,7 @@ void setup() {
 
 //função loop
 void loop() {
-  // Mantém MQTT vivo
+  // Mantém MQTT conectado
   if (!client.connected()) reconnectMQTT();
   client.loop();
 
