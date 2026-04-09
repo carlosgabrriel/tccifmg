@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="PT-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    
+    <style>
+        :root {
+            --bg: #110839;
+            --bbg: #32215e;
+            --tx: #9d6bff;
+            --gcX: red;
+            --gcY: blue;
+            --gcZ: green;
+        }
+        
+        body {
+            margin: 0;
+            background-image: linear-gradient(180deg, #32215e, #06002c);
+            color: black;
+            line-height: 1.5;
+        }
+
+        header{
+            text-align: center;
+            padding: 20px;
+            font-size: 28px;
+            font-weight: bold;
+
+            background-image: linear-gradient(270deg, #9d6bff, #6740b6);
+            border-radius: 10px;
+            width: 85%;
+            margin: auto;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+        
+        .coteinter{
+            width: 90%;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .card{
+            background: linear-gradient(270deg, #9d6bff, #6740b6);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 90%;
+            height: 90%;
+            margin: 5%;
+        }
+
+        .chartarea{
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+<header style="color: white;">
+    MONITORAMENTO DE VIBRAÇÕES
+</header>
+
+<main class="dashboard">
+
+    <div class="card">
+        <h2 style="color: white;">Gráfico em função da frequência</h2>
+        <div class="chartarea">
+            <canvas id="freqfunc"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 style="color: white;">Gráfico em função do tempo</h2>
+        <div class="chartarea">
+            <canvas id="timefunc"></canvas>
+        </div>
+    </div>
+
+</main>
+
+<script>
+  
+
+
+  const ctx = document.getElementById('freqfunc');
+
+let freq = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'EIXO X',
+            data: [],
+            borderWidth: 1,
+            borderColor: '#ff4d4d',
+            backgroundColor: '#ff4d4d',
+            pointRadius: 0,
+        },
+        {
+            label: 'EIXO Y',
+            data: [],
+            borderWidth: 1,
+            borderColor: '#4da6ff',
+            backgroundColor: '#4da6ff',
+            pointRadius: 0,
+        },
+        {
+            label: 'EIXO Z',
+            data: [],
+            borderWidth: 1,
+            borderColor: '#33cc99',
+            backgroundColor: '#33cc99',
+            pointRadius: 0,
+        }]
+    },
+    options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    color: "white",
+                }
+            }
+        },
+        scales: {
+            x: { ticks: { color: 'white', maxTicksLimit: 10 } },
+            y: { beginAtZero: true, min: 0, max: 1, ticks: { color: 'white' } }
+        }
+    }
+});
+
+const socket = new WebSocket("ws://localhost:8765");
+
+socket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    // substitui os dados inteiros a cada mensagem
+    freq.data.labels = data.freq.map(f => f.toFixed(1));
+    freq.data.datasets[0].data = data.x;
+    freq.data.datasets[1].data = data.y;
+    freq.data.datasets[2].data = data.z;
+
+    freq.update('none');
+}
+
+socket.onopen = function() {
+    console.log("WebSocket conectado!");
+}
+
+socket.onerror = function(error) {
+    console.log("Erro no WebSocket:", error);
+}
+
+socket.onclose = function() {
+    console.log("WebSocket desconectado!");
+}
+
+</script>
+
+
+</body>
+</html>
