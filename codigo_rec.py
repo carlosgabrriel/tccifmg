@@ -1,9 +1,11 @@
 import random
 import threading
 from paho.mqtt import client as mqtt_client
-import pyqtgraph as pg
 import numpy as np
-from pyqtgraph.Qt import QtCore, QtWidgets
+import asyncio
+import websockets
+import json
+import time
 
 #  Config MQTT 
 broker = 'broker.hivemq.com'
@@ -15,32 +17,7 @@ client_id = f'subscribe-{random.randint(0, 100)}'
 fs = 1000
 N = 1024
 amplixx, amplixy, amplixz = [], [], []
-
-#  Interface 
-app = pg.mkQApp("vibrac")
-window = QtWidgets.QMainWindow()
-window.setWindowTitle("Monitoramento em tempo real")
-window.resize(800, 600)
-
-
-central_widget = QtWidgets.QWidget()
-layout = QtWidgets.QVBoxLayout()
-central_widget.setLayout(layout)
-window.setCentralWidget(central_widget)
-
-plot1 = pg.PlotWidget(title="Vibração em função da frequência")
-plot1.setBackground("w")
-plot1.setXRange(0,500)
-plot1.setYRange(0,1)
-plot1.setLabel('left', "Amplitude")
-plot1.setLabel('bottom', "Frequência (Hz)")
-plot1.showGrid(x=True, y=True)
-plot1.addLegend()
-layout.addWidget(plot1)
-
-curve1 = plot1.plot(pen=pg.mkPen('r', width=2), name="Eixo X")
-curve2 = plot1.plot(pen=pg.mkPen('b', width=2), name="Eixo Y")
-curve3 = plot1.plot(pen=pg.mkPen('g', width=2), name="Eixo Z")
+fft_result = {"x": [], "y": [],"z": [],"freq": [] }
 
 #  MQTT 
 def connect_mqtt() -> mqtt_client:
@@ -76,8 +53,10 @@ def mqtt_thread():
     subscribe(client)
     client.loop_forever()
 
+
 #  FFT + Atualização de Gráfico (controlada por Timer) + pequenos filtros
 def atualizar_grafico():
+    global fft_result
     if len(amplixx) == N:
         t = 1/fs
         freq = np.fft.fftfreq(N, t)[:N//2]
@@ -102,20 +81,47 @@ def atualizar_grafico():
         fftyy[fftyy < 0.003] = 0
         fftzz[fftzz < 0.003] = 0
 
-        curve1.setData(freq, fftxx)
-        curve2.setData(freq, fftyy)
-        curve3.setData(freq, fftzz)
+        # salvar os dados 
+        fft_result = {
+            "freq": freq.tolist(),
+            "x": fftxx.tolist(),
+            "y": fftyy.tolist(),
+            "z": fftzz.tolist()
+        }
 
-#  Timer do Qt (20 FPS = 50 ms) 
-timer = QtCore.QTimer()
-timer.timeout.connect(atualizar_grafico)
-timer.start(50)
+# theread atualizao grafiCUZINHO
+def loop_att():
+    while True:
+        atualizar_grafico()
+        time.sleep(0.05)
 
-#  Thread MQTT 
-t = threading.Thread(target=mqtt_thread)
-t.daemon = True
-t.start()
 
-#  Inicia a interface 
-window.show()
-app.exec()
+async def senddata(websocket):
+    while True:
+        await websocket.send(json.dumps(fft_result))
+        await asyncio.sleep(0.05)
+
+#vida ao servidor 
+async def main():
+    async with websockets.serve(senddata,"localhost", 8765):
+        print("servidor vivo")
+        await asyncio.Future()
+
+def websoket_thread():
+    asyncio.run(main())
+
+t1 = threading.Thread(target=mqtt_thread)
+t1.daemon = True
+t1.start()
+
+
+t1 = threading.Thread(target=loop_att)
+t1.daemon = True
+t1.start()
+
+t1 = threading.Thread(target=websoket_thread)
+t1.daemon = True
+t1.start()
+
+while True:
+    time.sleep(1)   
