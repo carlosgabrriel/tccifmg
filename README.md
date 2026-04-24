@@ -57,20 +57,20 @@ Construir um sistema de baixo custo capaz de fazer a aquisição, transmissão, 
 
 ```
 ┌─────────────────┐        I2C        ┌─────────────────┐
-│   MPU6050       │ ────────────────► │    ESP32         │
+│   MPU6050       │ ────────────────► │    ESP32        │
 │  (Acelerômetro) │                   │  WROOM-32       │
 └─────────────────┘                   └────────┬────────┘
                                                │ Wi-Fi + MQTT
                                                ▼
                                     ┌─────────────────────┐
-                                    │   MQTT Broker        │
-                                    │  (broker.hivemq.com) │
+                                    │   MQTT Broker       │
+                                    │  (broker.hivemq.com)│
                                     └──────────┬──────────┘
                                                │ Subscribe
                                                ▼
                                     ┌─────────────────────┐
-                                    │   Software Python    │
-                                    │  FFT + Gráfico       │
+                                    │   Software Python   │
+                                    │  FFT + Gráfico      │
                                     └─────────────────────┘
 ```
 
