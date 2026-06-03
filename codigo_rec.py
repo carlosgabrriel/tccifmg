@@ -89,7 +89,7 @@ def atualizar_grafico():
             "z": fftzz.tolist()
         }
 
-# theread atualizao grafiCUZINHO
+# theread atualizao grafico
 def loop_att():
     while True:
         atualizar_grafico()
